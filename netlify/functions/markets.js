@@ -16,12 +16,16 @@ const STOCKS = [
   { symbol: "QQQ", name: "Nasdaq (QQQ proxy)" },
 ];
 const NAMED = { tsla: "TSLA", spcx: "SPCX" };
+const WATCHLIST = [
+  "MSFT", "NVDA", "GOOGL", "AMZN", "AAPL", "CAT", "AVGO", "PANW", "LLY", "TSM",
+  "IBM", "DELL", "META", "V", "GOOG", "GEV", "TER", "DE", "WMT", "TSLA",
+];
 const COMMODITIES = [
-  { symbol: "USO", name: "WTI Crude (USO proxy)" },
-  { symbol: "UNG", name: "Nat Gas (UNG proxy)" },
-  { symbol: "GLD", name: "Gold (GLD proxy)" },
-  { symbol: "SLV", name: "Silver (SLV proxy)" },
-  { symbol: "PPLT", name: "Platinum (PPLT proxy)" },
+  { symbol: "USO", name: "WTI Crude" },
+  { symbol: "UNG", name: "Nat Gas" },
+  { symbol: "GLD", name: "Gold" },
+  { symbol: "SLV", name: "Silver" },
+  { symbol: "PPLT", name: "Platinum" },
 ];
 const CRYPTO = [
   { symbol: "BINANCE:BTCUSDT", name: "Bitcoin" },
@@ -80,17 +84,18 @@ exports.handler = async () => {
     };
   }
 
-  const [futures, tsla, spcx, commodities, crypto] = await Promise.all([
+  const [futures, tsla, spcx, commodities, crypto, watchlist] = await Promise.all([
     Promise.all(STOCKS.map((s) => safeQuote(s.symbol, s.name))),
     safeQuote(NAMED.tsla, "Tesla"),
     safeQuote(NAMED.spcx, "SpaceX"),
     Promise.all(COMMODITIES.map((c) => safeQuote(c.symbol, c.name))),
     Promise.all(CRYPTO.map((c) => safeQuote(c.symbol, c.name))),
+    Promise.all(WATCHLIST.map((symbol) => safeQuote(symbol, symbol))),
   ]);
 
   return {
     statusCode: 200,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ futures, tsla, spcx, commodities: [...commodities, ...crypto] }),
+    body: JSON.stringify({ futures, tsla, spcx, commodities: [...commodities, ...crypto], watchlist }),
   };
 };
