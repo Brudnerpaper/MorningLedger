@@ -19,19 +19,46 @@ async function fetchJson(url) {
   return res.json();
 }
 
+// NWS marine zones are NOT served by the /zones/forecast/{id}/forecast JSON
+// endpoint (that's land zones only). Marine forecasts are published as text
+// bulletins ("Coastal Waters Forecast", product code CWF) by the issuing
+// office (BOX = Boston) and cover multiple zones in one document. We fetch
+// the latest CWF bulletin and parse out just the Cape Cod Bay (ANZ231) section.
+
 async function loadForecast() {
-  const data = await fetchJson(`https://api.weather.gov/zones/forecast/${ZONE}/forecast`);
-  const periods = data.properties.periods || [];
-  const pick = (name) => {
-    const p = periods.find((p) => p.name.toLowerCase().includes(name));
-    return p ? p.detailedForecast : null;
-  };
-  const advisoryPeriod = periods.find((p) => /small craft|advisory|warning/i.test(p.detailedForecast || ""));
+  const list = await fetchJson("https://api.weather.gov/products/types/CWF/locations/BOX");
+  const products = list["@graph"] || [];
+  if (!products.length) throw new Error("no CWF bulletins found for BOX");
+  const latest = await fetchJson(`https://api.weather.gov/products/${products[0].id}`);
+  const text = latest.productText || "";
+
+  // Isolate the ANZ231 (Cape Cod Bay) block: from its zone header to the
+  // next zone header or the "$$" end-of-segment marker.
+  const zoneMatch = text.match(/ANZ231-[\s\S]*?(?=\n\S*ANZ\d{3}-|\n\$\$|$)/);
+  if (!zoneMatch) throw new Error("ANZ231 section not found in bulletin");
+  let block = zoneMatch[0];
+
+  // Advisory/warning language is wrapped in triple-dots, e.g.
+  // "...SMALL CRAFT ADVISORY IN EFFECT FROM 4 PM EDT..."
+  const advisoryMatch = block.match(/\.\.\.([A-Z0-9 ,'\/-]*ADVISORY[\s\S]*?)\.\.\./);
+  const advisories = advisoryMatch ? advisoryMatch[1].replace(/\s+/g, " ").trim() : null;
+  if (advisoryMatch) block = block.replace(advisoryMatch[0], " ");
+
+  // Forecast periods are marked like ".TODAY...", ".TONIGHT...", ".WED...".
+  const markerRe = /\.([A-Z][A-Z ]{2,30})\.\.\./g;
+  const markers = [];
+  let m;
+  while ((m = markerRe.exec(block)) !== null) {
+    markers.push({ label: m[1].trim(), start: markerRe.lastIndex });
+  }
+  const periods = markers.map((mk, i) => {
+    const end = i + 1 < markers.length ? markers[i + 1].start - (markers[i + 1].label.length + 4) : block.length;
+    return { label: mk.label, text: block.slice(mk.start, end).replace(/\s+/g, " ").trim() };
+  }).filter((p) => p.text.length > 0);
+
   return {
-    advisories: advisoryPeriod ? "Small craft advisory / warning language present — read forecast" : "None flagged",
-    today: pick("today") || pick("this afternoon"),
-    tonight: pick("tonight"),
-    tomorrow: periods[2]?.detailedForecast || null,
+    advisories: advisories || "None flagged",
+    periods: periods.slice(0, 4),
   };
 }
 
