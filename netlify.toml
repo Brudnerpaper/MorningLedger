@@ -1,0 +1,13 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Cache the data functions at the edge for 10 minutes so repeated visits
+# during the same morning don't re-hit every upstream API.
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, s-maxage=600, stale-while-revalidate=300"

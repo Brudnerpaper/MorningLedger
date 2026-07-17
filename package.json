@@ -1,0 +1,9 @@
+{
+  "name": "morning-ledger",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Steve's daily Morning Ledger — weather, marine, Yankees, and markets.",
+  "scripts": {
+    "dev": "netlify dev"
+  }
+}
