@@ -32,9 +32,18 @@ const CRYPTO = [
   { symbol: "BINANCE:ETHUSDT", name: "Ethereum" },
 ];
 
-async function quote(symbol) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function quote(symbol, attempt = 0) {
   const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${KEY}`;
   const res = await fetch(url);
+  if (res.status === 429) {
+    if (attempt >= 3) throw new Error(`${symbol} -> rate limited (429) after retries`);
+    await sleep(500 * (attempt + 1)); // backoff: 500ms, 1000ms, 1500ms
+    return quote(symbol, attempt + 1);
+  }
   if (!res.ok) throw new Error(`${symbol} -> HTTP ${res.status}`);
   const d = await res.json();
   if (d.c === 0 && d.pc === 0) throw new Error(`${symbol} -> no data`);
@@ -46,6 +55,22 @@ async function quote(symbol) {
     low: d.l,
     up: d.c >= d.pc,
   };
+}
+
+// Run quote lookups in small batches with a short pause between batches,
+// rather than firing everything at once, to stay under Finnhub's per-second
+// burst limit on the free tier (separate from its 60/minute cap).
+async function batchQuotes(items, getSymbol, getName, batchSize = 6, pauseMs = 350) {
+  const results = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(
+      batch.map((item) => safeQuote(getSymbol(item), getName(item)))
+    );
+    results.push(...batchResults);
+    if (i + batchSize < items.length) await sleep(pauseMs);
+  }
+  return results;
 }
 
 function fmtPts(pts) {
@@ -84,14 +109,13 @@ exports.handler = async () => {
     };
   }
 
-  const [futures, tsla, spcx, commodities, crypto, watchlist] = await Promise.all([
-    Promise.all(STOCKS.map((s) => safeQuote(s.symbol, s.name))),
-    safeQuote(NAMED.tsla, "Tesla"),
-    safeQuote(NAMED.spcx, "SpaceX"),
-    Promise.all(COMMODITIES.map((c) => safeQuote(c.symbol, c.name))),
-    Promise.all(CRYPTO.map((c) => safeQuote(c.symbol, c.name))),
-    Promise.all(WATCHLIST.map((symbol) => safeQuote(symbol, symbol))),
-  ]);
+  // Fetch in this order, each batch pausing briefly before the next, so we
+  // never burst more than ~6 requests at Finnhub in the same instant.
+  const futures = await batchQuotes(STOCKS, (s) => s.symbol, (s) => s.name);
+  const [tsla, spcx] = await Promise.all([safeQuote(NAMED.tsla, "Tesla"), safeQuote(NAMED.spcx, "SpaceX")]);
+  const commodities = await batchQuotes(COMMODITIES, (c) => c.symbol, (c) => c.name);
+  const crypto = await batchQuotes(CRYPTO, (c) => c.symbol, (c) => c.name);
+  const watchlist = await batchQuotes(WATCHLIST, (s) => s, (s) => s);
 
   return {
     statusCode: 200,
