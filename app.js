@@ -151,11 +151,14 @@ async function loadMarkets() {
     const tslaRow = data.tsla ? quoteRow(data.tsla, "tsla-row") : "";
     const spcxRow = data.spcx ? quoteRow(data.spcx) : "";
     const commodityRows = (data.commodities || []).map((c) => quoteRow(c)).join("");
+    const watchlistRows = (data.watchlist || []).map((w) => quoteRow(w)).join("");
 
     $("markets-body").innerHTML = `
       <table class="quotes"><tbody>${futuresRows}${tslaRow}${spcxRow}</tbody></table>
       <div class="sub-label" style="margin-top:14px">Commodities &amp; Crypto</div>
       <table class="quotes"><tbody>${commodityRows}</tbody></table>
+      <div class="sub-label" style="margin-top:14px">Watchlist</div>
+      <table class="quotes"><tbody>${watchlistRows}</tbody></table>
       <p class="proxy-note">Dow/S&amp;P/Nasdaq and commodities are shown via liquid ETF proxies (DIA, SPY, QQQ, GLD, SLV, PPLT, USO, UNG) — Finnhub's free tier doesn't carry raw futures contracts.</p>`;
 
     const up = (data.futures || []).filter((f) => f.up).length;
