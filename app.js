@@ -71,11 +71,14 @@ async function loadMarine() {
     const b = data.buoy;
     let html = `<div class="marine-head">Provincetown · Cape Cod Bay</div>`;
     if (f) {
-      html += `<table class="mini-table"><tbody>
-        <tr><td class="mono">Today</td><td colspan="2">${esc(f.today || "—")}</td></tr>
-        <tr><td class="mono">Tonight</td><td colspan="2">${esc(f.tonight || "—")}</td></tr>
-        <tr><td class="mono">Next</td><td colspan="2">${esc(f.tomorrow || "—")}</td></tr>
-      </tbody></table>`;
+      const hasAdvisory = f.advisories && !/none/i.test(f.advisories);
+      html += hasAdvisory
+        ? `<div class="advisory">⚑ ${esc(f.advisories)}</div>`
+        : `<div class="no-advisory">No advisories in effect</div>`;
+      const rows = (f.periods || [])
+        .map((p) => `<tr><td class="mono">${esc(p.label)}</td><td>${esc(p.text)}</td></tr>`)
+        .join("");
+      html += `<table class="mini-table"><tbody>${rows}</tbody></table>`;
     } else {
       html += `<p class="dim" style="font-size:12.5px">Forecast unavailable (${esc(data.forecastError)})</p>`;
     }
