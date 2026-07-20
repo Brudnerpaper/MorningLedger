@@ -116,6 +116,7 @@ async function loadSports() {
       .join("");
     $("sports-body").innerHTML = `
       <div class="score-headline">${esc(data.lastNight?.headline)}</div>
+      ${data.lastNight?.recap ? `<div class="score-note">${esc(data.lastNight.recap)}</div>` : ""}
       <div class="two-col">
         <div><div class="sub-label">Last two</div>${lastTwo || '<p class="dim" style="font-size:12.5px">No recent games</p>'}</div>
         <div><div class="sub-label">Up next</div>${nextTwo || '<p class="dim" style="font-size:12.5px">TBD</p>'}</div>
@@ -169,11 +170,98 @@ async function loadMarkets() {
   }
 }
 
+// ---------- Night Sky ----------
+function nightHTML(town, night, isDetail) {
+  const planetsList = (night.planetsInView || []).length
+    ? night.planetsInView.map((p) => `${esc(p.name)} (${esc(p.direction)}, best ~${esc(p.bestTime)})`).join(", ")
+    : (night.planets || []).length
+      ? `${night.planets.length} planet(s) up, but not toward your usual view`
+      : "no bright planets well-placed tonight";
+  const showerNote = (night.showersInView || []).length
+    ? night.showersInView.map((s) => `${esc(s.name)}${s.isPeak ? " (peak tonight!)" : ""} — radiant ${esc(s.radiant)}, ~${s.zhr}/hr under dark skies`).join("; ")
+    : null;
+
+  if (isDetail) {
+    return `<div class="night-town">
+      <div class="night-town-head">${esc(town.label)} <span class="dim" style="font-size:11px">(facing ${esc(town.viewDirection)})</span></div>
+      <div class="night-line">🌙 ${esc(night.moon.phase)}, ${night.moon.illumPct}% illuminated${night.moon.moonrise ? ` · rises ${esc(night.moon.moonrise)}` : ""}${night.moon.moonset ? `, sets ${esc(night.moon.moonset)}` : ""}</div>
+      <div class="night-line">Dark skies: ${esc(night.darkWindow.start || "—")}–${esc(night.darkWindow.end || "—")}</div>
+      <div class="night-line"><strong>Best viewing:</strong> ${esc(night.bestViewing || "—")}</div>
+      <div class="night-line">Visible toward your sky: ${planetsList}</div>
+      ${showerNote ? `<div class="night-line shower-flag">☄ ${showerNote}</div>` : ""}
+    </div>`;
+  }
+  return night;
+}
+
+async function loadNightSky() {
+  $("nightsky-body").innerHTML = loadingHTML();
+  try {
+    const data = await getJSON("/.netlify/functions/nightsky");
+    const towns = ["truro", "lincoln", "upton"];
+    const detailHTML = `<div class="night-grid">${towns.map((k) => nightHTML(data[k], data[k].nights[0], true)).join("")}</div>`;
+
+    // 2-week outlook table: moon phase + any meteor shower, per town isn't
+    // needed separately since moon phase is the same everywhere — just
+    // flag showers per town's matching view.
+    const rows = data.truro.nights.map((n, i) => {
+      const showersAnywhere = towns
+        .map((k) => data[k].nights[i].showersInView.map((s) => `${s.name} (${data[k].label.split(",")[0]})`))
+        .flat();
+      return `<tr>
+        <td class="mono">${esc(n.date)}</td>
+        <td>${esc(n.moon.phase)} (${n.moon.illumPct}%)</td>
+        <td>${showersAnywhere.length ? `<span class="shower-flag">${esc(showersAnywhere.join(", "))}</span>` : "—"}</td>
+      </tr>`;
+    }).join("");
+
+    $("nightsky-body").innerHTML = `
+      ${detailHTML}
+      <div class="sub-label" style="margin-top:16px">14-Day Outlook</div>
+      <table class="outlook-table"><thead><tr><th>Date</th><th>Moon</th><th>Notable</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+      <p class="proxy-note">Planet visibility and moon data are calculated directly (no cloud forecast beyond ~7 days out, so treat the back half of the outlook as astronomy only, not a sky-clarity guarantee).</p>`;
+  } catch (e) {
+    $("nightsky-body").innerHTML = errorHTML("night sky", e.message, loadNightSky);
+  }
+}
+
+// ---------- Financial News ----------
+async function loadNews() {
+  $("news-body").innerHTML = loadingHTML();
+  try {
+    const data = await getJSON("/.netlify/functions/news");
+    const items = (data.headlines || [])
+      .map((h) => `<div class="news-item"><a href="${esc(h.url)}" target="_blank" rel="noopener">${esc(h.headline)}</a><span class="news-source">${esc(h.source)}</span></div>`)
+      .join("");
+    $("news-body").innerHTML = items || '<p class="dim" style="font-size:12.5px">No headlines available right now.</p>';
+  } catch (e) {
+    $("news-body").innerHTML = errorHTML("financial news", e.message, loadNews);
+  }
+}
+
+// ---------- On This Day ----------
+async function loadOnThisDay() {
+  $("onthisday-body").innerHTML = loadingHTML();
+  try {
+    const data = await getJSON("/.netlify/functions/onthisday");
+    $("onthisday-body").innerHTML = `
+      ${data.event ? `<div class="otd-event">${esc(data.event)}</div>` : ""}
+      <div class="otd-quote">"${esc(data.quote)}"</div>
+      <div class="otd-attribution">— ${esc(data.attribution)}</div>`;
+  } catch (e) {
+    $("onthisday-body").innerHTML = errorHTML("history", e.message, loadOnThisDay);
+  }
+}
+
 function loadAll() {
   loadWeather();
   loadMarine();
   loadSports();
   loadMarkets();
+  loadNightSky();
+  loadNews();
+  loadOnThisDay();
 }
 
 $("date-line").textContent = new Date()
