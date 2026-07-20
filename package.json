@@ -5,5 +5,8 @@
   "description": "Steve's daily Morning Ledger — weather, marine, Yankees, and markets.",
   "scripts": {
     "dev": "netlify dev"
+  },
+  "dependencies": {
+    "astronomy-engine": "^2.1.19"
   }
 }
