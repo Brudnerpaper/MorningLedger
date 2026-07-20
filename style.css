@@ -63,6 +63,7 @@ body {
 .buoy { margin-top: 10px; }
 
 .score-headline { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 21px; line-height: 1.15; }
+.score-note { font-size: 12.5px; color: var(--dim); margin: 4px 0 8px; font-family: 'IBM Plex Mono', monospace; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .game-line { font-size: 13px; padding: 3px 0; border-top: 1px dotted var(--rule); display: flex; gap: 6px; flex-wrap: wrap; }
 .game-line .result { margin-left: auto; }
@@ -91,4 +92,28 @@ body {
 .retry { font-family: 'IBM Plex Mono', monospace; font-size: 11px; background: none; border: 1px solid var(--dim); color: var(--ink); padding: 3px 10px; margin-top: 6px; cursor: pointer; }
 .retry:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 
-.footer { text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1px; color: var(--dim); margin-top: 26px; }
+.footer-rule { border-top: 3px double var(--ink); margin: 24px 0 18px; }
+.wide-section { margin-bottom: 24px; }
+.wide-section .section-label { margin-bottom: 10px; }
+
+.night-town { margin-bottom: 16px; }
+.night-town-head { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+.night-line { font-size: 13.5px; margin: 3px 0; }
+.night-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; }
+.outlook-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+.outlook-table th { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--dim); text-align: left; padding: 3px 6px 3px 0; border-bottom: 1px solid var(--ink); }
+.outlook-table td { padding: 3px 6px 3px 0; border-bottom: 1px dotted var(--rule); vertical-align: top; }
+.shower-flag { color: var(--accent); font-weight: 600; }
+
+.news-item { font-size: 13.5px; padding: 6px 0; border-top: 1px dotted var(--rule); }
+.news-item:first-child { border-top: none; }
+.news-item a { color: var(--ink); text-decoration: none; }
+.news-item a:hover { text-decoration: underline; }
+.news-source { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--dim); margin-left: 6px; }
+
+.otd-event { font-size: 14.5px; margin-bottom: 8px; }
+.otd-quote { font-family: 'Playfair Display', serif; font-style: italic; font-size: 16px; line-height: 1.4; }
+.otd-attribution { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--dim); margin-top: 4px; }
+
+.footer {
+ text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1px; color: var(--dim); margin-top: 26px; }
