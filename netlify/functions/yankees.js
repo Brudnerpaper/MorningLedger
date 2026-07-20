@@ -1,5 +1,11 @@
 // MLB Stats API is free and unauthenticated. Yankees teamId = 147,
 // AL East divisionId = 201.
+//
+// IMPORTANT: the bare /schedule endpoint does NOT include final scores —
+// that requires hydrate=linescore. Score lives at game.linescore.teams.
+// {home,away}.runs, not game.teams.{home,away}.score (which doesn't exist
+// on this endpoint and was the source of the "undefined-undefined" bug).
+// hydrate=decisions adds winning/losing/save pitcher for a real recap line.
 const TEAM_ID = 147;
 const AL_EAST_DIVISION_ID = 201;
 
@@ -21,7 +27,7 @@ async function loadSchedule() {
   end.setDate(end.getDate() + 5);
 
   const data = await fetchJson(
-    `https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=${TEAM_ID}&startDate=${fmtDate(start)}&endDate=${fmtDate(end)}`
+    `https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=${TEAM_ID}&startDate=${fmtDate(start)}&endDate=${fmtDate(end)}&hydrate=linescore,decisions`
   );
   const games = (data.dates || []).flatMap((d) => d.games);
 
@@ -32,15 +38,20 @@ async function loadSchedule() {
     .filter((g) => g.status.abstractGameState !== "Final")
     .sort((a, b) => new Date(a.gameDate) - new Date(b.gameDate));
 
+  const getRuns = (g, side) => g.linescore?.teams?.[side]?.runs ?? g.teams?.[side]?.score ?? null;
+
   const describeGame = (g, forPast) => {
     const isHome = g.teams.home.team.id === TEAM_ID;
     const opp = isHome ? g.teams.away.team : g.teams.home.team;
     const dateStr = new Date(g.gameDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
     if (forPast) {
-      const us = isHome ? g.teams.home : g.teams.away;
-      const them = isHome ? g.teams.away : g.teams.home;
-      const result = us.score > them.score ? "W" : "L";
-      return { date: dateStr, opponent: `${isHome ? "vs" : "at"} ${opp.name}`, result: `${result} ${us.score}-${them.score}` };
+      const usSide = isHome ? "home" : "away";
+      const themSide = isHome ? "away" : "home";
+      const usRuns = getRuns(g, usSide);
+      const themRuns = getRuns(g, themSide);
+      const result = usRuns !== null && themRuns !== null ? (usRuns > themRuns ? "W" : "L") : "?";
+      const scoreStr = usRuns !== null && themRuns !== null ? `${result} ${usRuns}-${themRuns}` : "Final (score n/a)";
+      return { date: dateStr, opponent: `${isHome ? "vs" : "at"} ${opp.name}`, result: scoreStr };
     }
     const time = new Date(g.gameDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
     return { date: dateStr, opponent: `${isHome ? "vs" : "at"} ${opp.name}`, time };
@@ -50,19 +61,35 @@ async function loadSchedule() {
   const nextTwo = future.slice(0, 2).map((g) => describeGame(g, false));
 
   const lastGame = past[past.length - 1];
-  let lastNight = { played: false, headline: "No Yankees game recently — check schedule" };
+  let lastNight = { played: false, headline: "No Yankees game recently — check schedule", recap: null };
   if (lastGame) {
     const gameDate = new Date(lastGame.gameDate);
     const hoursSince = (today - gameDate) / 36e5;
     if (hoursSince < 30) {
       const isHome = lastGame.teams.home.team.id === TEAM_ID;
-      const us = isHome ? lastGame.teams.home : lastGame.teams.away;
-      const them = isHome ? lastGame.teams.away : lastGame.teams.home;
-      const result = us.score > them.score ? "W" : "L";
-      lastNight = {
-        played: true,
-        headline: `Yankees ${result === "W" ? "beat" : "fell to"} ${them.team.name} ${us.score}-${them.score}`,
-      };
+      const usSide = isHome ? "home" : "away";
+      const themSide = isHome ? "away" : "home";
+      const usRuns = getRuns(lastGame, usSide);
+      const themRuns = getRuns(lastGame, themSide);
+      const opp = isHome ? lastGame.teams.away.team : lastGame.teams.home.team;
+
+      let headline = `Yankees game vs ${opp.name} — score unavailable`;
+      if (usRuns !== null && themRuns !== null) {
+        const result = usRuns > themRuns ? "beat" : "fell to";
+        headline = `Yankees ${result} ${opp.name} ${usRuns}-${themRuns}`;
+      }
+
+      let recap = null;
+      const dec = lastGame.decisions;
+      if (dec) {
+        const parts = [];
+        if (dec.winner) parts.push(`W: ${dec.winner.fullName}`);
+        if (dec.loser) parts.push(`L: ${dec.loser.fullName}`);
+        if (dec.save) parts.push(`SV: ${dec.save.fullName}`);
+        if (parts.length) recap = parts.join(" · ");
+      }
+
+      lastNight = { played: true, headline, recap };
     }
   }
 
