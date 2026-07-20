@@ -5,10 +5,16 @@
 // label them clearly on the frontend so there's no confusion with the
 // artifact version's raw futures quotes.
 //
-// Requires env var FINNHUB_API_KEY (set in Netlify site settings -> 
+// Requires env var FINNHUB_API_KEY (set in Netlify site settings ->
 // Environment variables — do NOT hardcode the key here).
+//
+// Propane is a separate government data source: EIA's Weekly Heating Oil
+// and Propane Survey publishes a Massachusetts residential propane price
+// (series W_EPLLPA_PRS_SMA_DPG). Requires env var EIA_API_KEY (also free,
+// from eia.gov/opendata).
 
 const KEY = process.env.FINNHUB_API_KEY;
+const EIA_KEY = process.env.EIA_API_KEY;
 
 const STOCKS = [
   { symbol: "DIA", name: "Dow (DIA proxy)" },
@@ -100,6 +106,34 @@ async function safeQuote(symbol, name) {
   }
 }
 
+// EIA's weekly MA residential propane series, via the v2 API's
+// backward-compatible /seriesid/ path. Returns the two most recent weekly
+// readings so we can show week-over-week change (propane doesn't have an
+// intraday "quote" the way stocks do — it updates once a week).
+async function loadPropane() {
+  if (!EIA_KEY) return { name: "Propane (MA avg)", error: "EIA_API_KEY not set" };
+  const url = `https://api.eia.gov/v2/seriesid/W_EPLLPA_PRS_SMA_DPG?api_key=${EIA_KEY}`;
+  const res = await fetch(url);
+  if (!res.ok) return { name: "Propane (MA avg)", error: `HTTP ${res.status}` };
+  const data = await res.json();
+  const rows = data.response?.data || [];
+  if (!rows.length) return { name: "Propane (MA avg)", error: "no data returned" };
+  // Rows are typically newest-first; sort defensively by period descending.
+  rows.sort((a, b) => (a.period < b.period ? 1 : -1));
+  const latest = parseFloat(rows[0].value);
+  const prior = rows[1] ? parseFloat(rows[1].value) : null;
+  const pts = prior !== null ? +(latest - prior).toFixed(3) : null;
+  const pct = prior ? (pts / prior) * 100 : null;
+  return {
+    name: "Propane (MA avg)",
+    value: `$${latest.toFixed(3)}/gal`,
+    pts: pts !== null ? fmtPts(pts) : "n/a",
+    change: pct !== null ? fmtPct(pct) : "n/a",
+    up: pts !== null ? pts >= 0 : null,
+    asOf: rows[0].period,
+  };
+}
+
 exports.handler = async () => {
   if (!KEY) {
     return {
@@ -112,7 +146,11 @@ exports.handler = async () => {
   // Fetch in this order, each batch pausing briefly before the next, so we
   // never burst more than ~6 requests at Finnhub in the same instant.
   const futures = await batchQuotes(STOCKS, (s) => s.symbol, (s) => s.name);
-  const [tsla, spcx] = await Promise.all([safeQuote(NAMED.tsla, "Tesla"), safeQuote(NAMED.spcx, "SpaceX")]);
+  const [tsla, spcx, propane] = await Promise.all([
+    safeQuote(NAMED.tsla, "Tesla"),
+    safeQuote(NAMED.spcx, "SpaceX"),
+    loadPropane(),
+  ]);
   const commodities = await batchQuotes(COMMODITIES, (c) => c.symbol, (c) => c.name);
   const crypto = await batchQuotes(CRYPTO, (c) => c.symbol, (c) => c.name);
   const watchlist = await batchQuotes(WATCHLIST, (s) => s, (s) => s);
@@ -120,6 +158,6 @@ exports.handler = async () => {
   return {
     statusCode: 200,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ futures, tsla, spcx, commodities: [...commodities, ...crypto], watchlist }),
+    body: JSON.stringify({ futures, tsla, spcx, commodities: [...commodities, propane, ...crypto], watchlist }),
   };
 };
