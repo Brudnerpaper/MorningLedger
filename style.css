@@ -78,6 +78,8 @@ body {
 .quotes { width: 100%; border-collapse: collapse; font-size: 14px; }
 .quotes td { padding: 6px 4px 6px 0; border-bottom: 1px dotted var(--rule); }
 .tsla-row td { border-top: 1px solid var(--ink); }
+.vstr-row td { border-top: 2px solid var(--accent); border-bottom: 2px solid var(--accent); background: rgba(31,58,95,0.05); }
+.vstr-note { font-size: 10.5px; color: var(--dim); margin: 4px 0 0; font-style: italic; }
 .range-row td { font-size: 10.5px; padding: 0 0 6px; border-bottom: 1px dotted var(--rule); }
 .arrow { font-size: 10px; }
 .arrow.up { color: var(--green); }
