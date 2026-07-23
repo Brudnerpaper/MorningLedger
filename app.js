@@ -160,7 +160,7 @@ async function loadMarkets() {
       <table class="quotes"><tbody>${commodityRows}</tbody></table>
       <div class="sub-label" style="margin-top:14px">Watchlist</div>
       <table class="quotes"><tbody>${watchlistRows}</tbody></table>
-      <p class="proxy-note">Dow/S&amp;P/Nasdaq and commodities are shown via liquid ETF proxies (DIA, SPY, QQQ, GLD, SLV, PPLT, USO, UNG) — Finnhub's free tier doesn't carry raw futures contracts.</p>`;
+      <p class="proxy-note">Futures update nearly around the clock (unlike stocks), so overnight and pre-market moves should show here, not just yesterday's close.</p>`;
 
     const up = (data.futures || []).filter((f) => f.up).length;
     const ear = $("ear-markets").querySelector(".ear-big");
