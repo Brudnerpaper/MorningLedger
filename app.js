@@ -160,7 +160,7 @@ async function loadMarkets() {
     const vstrHTML = vstr && !vstr.error
       ? `<div class="sub-label">Your Portfolio</div>
          <table class="quotes"><tbody>${quoteRow(vstr, "vstr-row")}</tbody></table>
-         <div class="vstr-note">${esc(vstr.note)} · NAV ${esc(vstr.nav)} · ${esc(vstr.shares)} shares · YTD ${esc(vstr.ytdChange)}</div>`
+         <div class="vstr-note">${esc(vstr.note)} · NAV ${esc(vstr.nav)} · YTD ${esc(vstr.ytdChange)}</div>`
       : `<div class="sub-label">Your Portfolio</div><p class="dim" style="font-size:12.5px">VSTR unavailable${vstr?.error ? ` (${esc(vstr.error)})` : ""}</p>`;
 
     $("markets-body").innerHTML = `
