@@ -147,14 +147,25 @@ function quoteRow(q, extraClass) {
 async function loadMarkets() {
   $("markets-body").innerHTML = loadingHTML();
   try {
-    const data = await getJSON("/.netlify/functions/markets");
+    const [data, vstr] = await Promise.all([
+      getJSON("/.netlify/functions/markets"),
+      getJSON("/.netlify/functions/vstr").catch((e) => ({ error: e.message })),
+    ]);
     const futuresRows = (data.futures || []).map((f) => quoteRow(f)).join("");
     const tslaRow = data.tsla ? quoteRow(data.tsla, "tsla-row") : "";
     const spcxRow = data.spcx ? quoteRow(data.spcx) : "";
     const commodityRows = (data.commodities || []).map((c) => quoteRow(c)).join("");
     const watchlistRows = (data.watchlist || []).map((w) => quoteRow(w)).join("");
 
+    const vstrHTML = vstr && !vstr.error
+      ? `<div class="sub-label">Your Portfolio</div>
+         <table class="quotes"><tbody>${quoteRow(vstr, "vstr-row")}</tbody></table>
+         <div class="vstr-note">${esc(vstr.note)} · NAV ${esc(vstr.nav)} · ${esc(vstr.shares)} shares · YTD ${esc(vstr.ytdChange)}</div>`
+      : `<div class="sub-label">Your Portfolio</div><p class="dim" style="font-size:12.5px">VSTR unavailable${vstr?.error ? ` (${esc(vstr.error)})` : ""}</p>`;
+
     $("markets-body").innerHTML = `
+      ${vstrHTML}
+      <div class="sub-label" style="margin-top:14px">Futures</div>
       <table class="quotes"><tbody>${futuresRows}${tslaRow}${spcxRow}</tbody></table>
       <div class="sub-label" style="margin-top:14px">Commodities &amp; Crypto</div>
       <table class="quotes"><tbody>${commodityRows}</tbody></table>
