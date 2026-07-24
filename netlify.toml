@@ -14,3 +14,11 @@
   for = "/.netlify/functions/*"
   [headers.values]
     Cache-Control = "public, max-age=0, s-maxage=600, stale-while-revalidate=300"
+
+# Real estate listings via RentCast's free tier (50 calls/month) — cache for
+# 3 days since listings don't change meaningfully day to day, keeping
+# monthly usage well under budget (3 towns x ~10 refreshes/month = 30 calls).
+[[headers]]
+  for = "/.netlify/functions/realestate"
+  [headers.values]
+    Cache-Control = "public, max-age=0, s-maxage=259200, stale-while-revalidate=86400"
