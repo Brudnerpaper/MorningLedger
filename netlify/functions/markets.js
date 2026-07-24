@@ -179,13 +179,52 @@ async function batchYahooQuotes(items, batchSize = 4, pauseMs = 300) {
 // intraday "quote" the way stocks do — it updates once a week).
 async function loadPropane() {
   if (!EIA_KEY) return { name: "Propane (MA avg)", error: "EIA_API_KEY not set" };
-  const url = `https://api.eia.gov/v2/seriesid/W_EPLLPA_PRS_SMA_DPG?api_key=${EIA_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) return { name: "Propane (MA avg)", error: `HTTP ${res.status}` };
-  const data = await res.json();
-  const rows = data.response?.data || [];
-  if (!rows.length) return { name: "Propane (MA avg)", error: "no data returned" };
-  // Rows are typically newest-first; sort defensively by period descending.
+
+  // Primary: v1-style series ID via v2's backward-compat path. Full v1 IDs
+  // need the category prefix + frequency suffix (category.series.freq) —
+  // just the middle segment 404s as "series not found".
+  const legacyUrl = `https://api.eia.gov/v2/seriesid/PET.W_EPLLPA_PRS_SMA_DPG.W?api_key=${EIA_KEY}`;
+  let rows = null;
+  let lastError = null;
+
+  try {
+    const res = await fetch(legacyUrl);
+    if (res.ok) {
+      const data = await res.json();
+      rows = data.response?.data || null;
+    } else {
+      lastError = `legacy path HTTP ${res.status}`;
+    }
+  } catch (e) {
+    lastError = `legacy path ${e.message}`;
+  }
+
+  // Fallback: query the native v2 route + facets directly if the legacy
+  // series-ID path didn't pan out.
+  if (!rows || !rows.length) {
+    try {
+      const nativeUrl = `https://api.eia.gov/v2/petroleum/pri/wfr/data/?api_key=${EIA_KEY}&frequency=weekly&data[0]=value&facets[duoarea][]=SMA&facets[product][]=EPLLPA&facets[process][]=PRS&sort[0][column]=period&sort[0][direction]=desc&length=2`;
+      const res2 = await fetch(nativeUrl);
+      if (res2.ok) {
+        const data2 = await res2.json();
+        const nativeRows = data2.response?.data || [];
+        if (nativeRows.length) {
+          rows = nativeRows.map((r) => ({ period: r.period, value: r.value }));
+        } else {
+          lastError = `${lastError || ""} · native route returned no rows`.trim();
+        }
+      } else {
+        lastError = `${lastError || ""} · native route HTTP ${res2.status}`.trim();
+      }
+    } catch (e) {
+      lastError = `${lastError || ""} · native route ${e.message}`.trim();
+    }
+  }
+
+  if (!rows || !rows.length) {
+    return { name: "Propane (MA avg)", error: lastError || "no data returned" };
+  }
+
   rows.sort((a, b) => (a.period < b.period ? 1 : -1));
   const latest = parseFloat(rows[0].value);
   const prior = rows[1] ? parseFloat(rows[1].value) : null;
