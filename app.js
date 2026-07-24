@@ -265,6 +265,49 @@ async function loadOnThisDay() {
   }
 }
 
+// ---------- Real Estate ----------
+function listingHTML(l) {
+  const details = [
+    l.units ? `${l.units} units` : null,
+    l.beds ? `${l.beds} bd` : null,
+    l.baths ? `${l.baths} ba` : null,
+    l.sqft ? `${l.sqft.toLocaleString()} sqft` : null,
+    l.daysOnMarket !== null ? `${l.daysOnMarket}d on market` : null,
+  ].filter(Boolean).join(" · ");
+  const addr = l.url
+    ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.address)}</a>`
+    : esc(l.address);
+  return `<div class="re-listing">
+    <div>
+      <div class="re-address">${addr}</div>
+      <div class="re-details">${esc(details)}</div>
+      ${l.rehabFlag ? `<div class="re-flag">⚠ listing language suggests possible rehab work</div>` : ""}
+    </div>
+    <div class="re-price">${esc(l.price)}</div>
+  </div>`;
+}
+
+async function loadRealEstate() {
+  $("realestate-body").innerHTML = loadingHTML();
+  try {
+    const data = await getJSON("/.netlify/functions/realestate");
+    const towns = ["Uxbridge", "Upton", "Northbridge"];
+    const html = towns.map((town) => {
+      const t = data[town];
+      if (!t) return "";
+      const listingsHTML = t.error
+        ? `<p class="re-none">Unavailable (${esc(t.error)})</p>`
+        : t.listings.length
+          ? t.listings.map(listingHTML).join("")
+          : `<p class="re-none">No active multi-family listings found right now.</p>`;
+      return `<div class="re-town"><div class="re-town-head">${esc(town)}</div>${listingsHTML}</div>`;
+    }).join("");
+    $("realestate-body").innerHTML = html + `<p class="proxy-note">Listings refresh every few days (not every visit) to stay within the data provider's free-tier limits. GRM/cap rate need manual rent research — not calculated here.</p>`;
+  } catch (e) {
+    $("realestate-body").innerHTML = errorHTML("real estate", e.message, loadRealEstate);
+  }
+}
+
 function loadAll() {
   loadWeather();
   loadMarine();
@@ -273,6 +316,7 @@ function loadAll() {
   loadNightSky();
   loadNews();
   loadOnThisDay();
+  loadRealEstate();
 }
 
 $("date-line").textContent = new Date()
